@@ -138,7 +138,7 @@ def addUsers():
     btn_salvar = ctk.CTkButton(show, text="Salvar", command=salvar)
     btn_salvar.pack(pady=10)
 
-# --- UI principal ---
+# INTERFACE
 label_passageiros = ctk.CTkLabel(app, text='Passageiros')
 label_passageiros.pack(pady=10)
 
