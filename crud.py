@@ -1,21 +1,19 @@
-
 import sqlite3
 import pandas as pd
 import customtkinter as ctk
-from tkinter import ttk  # <-- ADICIONE ESTA LINHA
+from tkinter import ttk
 from datetime import date
+from tkinter import ttk, messagebox
 
 # ctk
-ctk.set_appearance_mode('light')  # defina uma vez
+ctk.set_appearance_mode('light') 
 app = ctk.CTk()
 app.title('Mostrar Passageiros')
 app.geometry('300x300')
 
-# --- Funções utilitárias de BD ---
 DB_PATH = "crud.db"
 
 def ensure_schema():
-    """Cria a tabela 'passageiros' se não existir."""
     con = sqlite3.connect(DB_PATH)
     try:
         cur = con.cursor()
@@ -41,13 +39,10 @@ def load_passageiros():
     finally:
         con.close()
 
-# --- Inicialização do BD ---
 ensure_schema()
 
-# --- Funções da UI ---
 def showUsers():
-    """Abre uma nova janela com os passageiros em tabela (Treeview com rolagem e estilo)."""
-    df = load_passageiros()  # ler atualizado
+    df = load_passageiros()
 
     win = ctk.CTkToplevel(app)
     win.title('Passageiros')
@@ -56,13 +51,10 @@ def showUsers():
     container = ctk.CTkFrame(win)
     container.pack(fill="both", expand=True, padx=10, pady=10)
 
-    # Define colunas (se tabela vazia, usa estrutura padrão)
     columns = list(df.columns) if not df.empty else ["id", "nome", "empresa", "email", "data_cadastro"]
 
-    # Cria tabela
     tree = ttk.Treeview(container, columns=columns, show="headings")
 
-    # Cabeçalhos e largura por coluna
     for col in columns:
         tree.heading(col, text=col.upper())
         width = 120
@@ -76,12 +68,10 @@ def showUsers():
             width = 120
         tree.column(col, width=width, anchor="w")
 
-    # Insere linhas
     if not df.empty:
         for _, row in df.iterrows():
             tree.insert("", "end", values=[row[c] for c in columns])
-
-    # Scrollbars (CustomTkinter) ligadas ao Treeview
+            
     vscroll = ctk.CTkScrollbar(container, orientation="vertical", command=tree.yview)
     vscroll.pack(side="right", fill="y")
     tree.configure(yscrollcommand=vscroll.set)
@@ -92,8 +82,7 @@ def showUsers():
 
     # Posiciona a tabela
     tree.pack(side="left", fill="both", expand=True)
-
-    # ===== Estilo para sensação de “grades” =====
+    
     style = ttk.Style()
     style.theme_use("default")
 
@@ -166,13 +155,140 @@ def addUsers():
     btn_salvar = ctk.CTkButton(show, text="Salvar", command=salvar)
     btn_salvar.pack(pady=10)
 
+def delete_by_id(id_):
+    con = sqlite3.connect(DB_PATH)
+    try:
+        cur = con.cursor()
+        cur.execute("DELETE FROM passageiros WHERE id = ?", (id_,))
+        con.commit()
+        return cur.rowcount  # 1 se deletou; 0 se não encontrou
+    finally:
+        con.close()
+
 def deleteUsers():
+    df = load_passageiros()
     delete = ctk.CTkToplevel(app)
     delete.title('Remover Passageiros')
-    delete.geometry('300x300')
+    delete.geometry('800x450')
     
+    container = ctk.CTkFrame(delete)
+    container.pack(fill="both", expand=True, padx=10, pady=10)
+    filter_frame = ctk.CTkFrame(container)
+    filter_frame.pack(fill='x', padx=0, pady=(0, 8))
+    entry_filter = ctk.CTkEntry(filter_frame, width=300, placeholder_text="Filtrar por nome/email...")
+    entry_filter.pack(side="left", padx=(0, 8), pady=6)
+    btn_apply_filter = ctk.CTkButton(filter_frame, text="Aplicar filtro")
+    btn_apply_filter.pack(side="left", pady=6)
     
-    
+    columns = ["id", "nome", "empresa", "email", "data_cadastro"]
+    tree = ttk.Treeview(container, columns=columns, show="headings", selectmode="browse")
+
+    for col in columns:
+        tree.heading(col, text=col.upper())
+        width = 120
+        if col == "id":
+            width = 60
+        elif col in ("nome", "empresa"):
+            width = 180
+        elif col == "email":
+            width = 240
+        elif col == "data_cadastro":
+            width = 120
+        tree.column(col, width=width, anchor="w")
+
+    # Scrollbars
+    vscroll = ctk.CTkScrollbar(container, orientation="vertical", command=tree.yview)
+    vscroll.pack(side="right", fill="y")
+    tree.configure(yscrollcommand=vscroll.set)
+
+    hscroll = ctk.CTkScrollbar(container, orientation="horizontal", command=tree.xview)
+    hscroll.pack(side="bottom", fill="x")
+    tree.configure(xscrollcommand=hscroll.set)
+
+    tree.pack(side="left", fill="both", expand=True)
+
+    # --- Estilo mais claro (se quiser manter dark, remova este bloco) ---
+    style = ttk.Style()
+    style.theme_use("default")
+    style.configure("Treeview",
+                    background="#ffffff",
+                    foreground="#000000",
+                    fieldbackground="#ffffff",
+                    rowheight=26,
+                    borderwidth=1)
+    style.configure("Treeview.Heading",
+                    background="#e6e6e6",
+                    foreground="#000000",
+                    font=("Segoe UI", 10, "bold"),
+                    relief="solid")
+
+    # --- Helpers para popular/refresh ---
+    def populate_tree(df: pd.DataFrame):
+        tree.delete(*tree.get_children())
+        if df.empty:
+            return
+        for i, (_, row) in enumerate(df.iterrows()):
+            tree.insert("", "end", values=[row[c] for c in columns],
+                        tags=("even",) if i % 2 == 0 else ("odd",))
+        tree.tag_configure("odd", background="#ffffff")   # zebra clara
+        tree.tag_configure("even", background="#f2f2f2")
+
+    def reload_data():
+        df = load_passageiros()
+        populate_tree(df)
+
+    # --- Filtro ---
+    def apply_filter():
+        term = entry_filter.get().strip().lower()
+        df = load_passageiros()
+        if term:
+            df = df[df.apply(
+                lambda r: term in str(r["nome"]).lower() or term in str(r["email"]).lower(),
+                axis=1
+            )]
+        populate_tree(df)
+
+    btn_apply_filter.configure(command=apply_filter)
+
+    # --- Deletar item selecionado ---
+    def delete_selected():
+        sel = tree.selection()
+        if not sel:
+            messagebox.showinfo("Atenção", "Selecione um passageiro na tabela.")
+            return
+        values = tree.item(sel[0], "values")
+        id_ = values[0]  # primeira coluna é id
+        nome = values[1]
+        # Confirmação
+        if not messagebox.askyesno("Confirmar", f"Tem certeza que deseja remover:\n\nID {id_} — {nome}?"):
+            return
+        deleted = delete_by_id(id_)
+        if deleted:
+            messagebox.showinfo("OK", f"Passageiro ID {id_} removido.")
+            reload_data()
+        else:
+            messagebox.showerror("Erro", "Não foi possível remover. Registro não encontrado.")
+
+    # --- Duplo clique também deleta (opcional; pode comentar se achar perigoso) ---
+    def on_double_click(event):
+        delete_selected()
+    tree.bind("<Double-1>", on_double_click)
+
+    # --- Barra inferior com ações ---
+    actions = ctk.CTkFrame(delete)
+    actions.pack(fill="x", padx=10, pady=(6, 10))
+
+    btn_delete = ctk.CTkButton(actions, text="Deletar selecionado", command=delete_selected)
+    btn_delete.pack(side="left", padx=(0, 8), pady=4)
+
+    btn_refresh = ctk.CTkButton(actions, text="Atualizar", command=reload_data)
+    btn_refresh.pack(side="left", pady=4)
+
+    btn_close = ctk.CTkButton(actions, text="Fechar", command=delete.destroy)
+    btn_close.pack(side="right", pady=4)
+
+    # Carrega inicialmente
+    reload_data()
     
 # INTERFACE
 label_passageiros = ctk.CTkLabel(app, text='Passageiros')
