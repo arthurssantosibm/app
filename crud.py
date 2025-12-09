@@ -166,6 +166,14 @@ def addUsers():
     btn_salvar = ctk.CTkButton(show, text="Salvar", command=salvar)
     btn_salvar.pack(pady=10)
 
+def deleteUsers():
+    delete = ctk.CTkToplevel(app)
+    delete.title('Remover Passageiros')
+    delete.geometry('300x300')
+    
+    
+    
+    
 # INTERFACE
 label_passageiros = ctk.CTkLabel(app, text='Passageiros')
 label_passageiros.pack(pady=10)
@@ -175,5 +183,8 @@ botao.pack(pady=10)
 
 botao_add = ctk.CTkButton(app, text='Adicionar', command=addUsers)
 botao_add.pack(pady=10)
+
+botao_del = ctk.CTkButton(app, text='Remover', command=deleteUsers)
+botao_del.pack(pady=10)
 
 app.mainloop()
