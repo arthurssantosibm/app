@@ -2,10 +2,11 @@
 import sqlite3
 import pandas as pd
 import customtkinter as ctk
+from tkinter import ttk  # <-- ADICIONE ESTA LINHA
 from datetime import date
 
 # ctk
-ctk.set_appearance_mode('dark')  # defina uma vez
+ctk.set_appearance_mode('light')  # defina uma vez
 app = ctk.CTk()
 app.title('Mostrar Passageiros')
 app.geometry('300x300')
@@ -63,32 +64,88 @@ def load_passageiros():
     """Retorna um DataFrame atualizado de passageiros."""
     con = sqlite3.connect(DB_PATH)
     try:
-        df = pd.read_sql_query("SELECT * FROM passageiros", con)
+        df = pd.read_sql_query("SELECT id, nome, empresa, email, data_cadastro FROM passageiros ORDER BY nome ASC", con)
         return df
     finally:
         con.close()
 
-# --- Inicialização do BD (ordem correta) ---
+# --- Inicialização do BD ---
 ensure_schema()
 insert_seed_data()
 
-# Carrega dados iniciais (opcional; a função showUsers também recarrega)
-dados = load_passageiros()
-
 # --- Funções da UI ---
 def showUsers():
-    """Abre uma nova janela com os passageiros (lendo do BD na hora)."""
+    """Abre uma nova janela com os passageiros em tabela (Treeview com rolagem e estilo)."""
     df = load_passageiros()  # ler atualizado
+
     win = ctk.CTkToplevel(app)
     win.title('Passageiros')
-    win.geometry('500x400')
+    win.geometry('800x450')
 
-    textbox = ctk.CTkTextbox(win, width=480, height=320)
-    textbox.pack(padx=10, pady=10, fill="both", expand=True)
-    texto_df = df.to_string(index=False)
-    textbox.insert("0.0", texto_df)
-    textbox.configure(state="disabled")
+    container = ctk.CTkFrame(win)
+    container.pack(fill="both", expand=True, padx=10, pady=10)
 
+    # Define colunas (se tabela vazia, usa estrutura padrão)
+    columns = list(df.columns) if not df.empty else ["id", "nome", "empresa", "email", "data_cadastro"]
+
+    # Cria tabela
+    tree = ttk.Treeview(container, columns=columns, show="headings")
+
+    # Cabeçalhos e largura por coluna
+    for col in columns:
+        tree.heading(col, text=col.upper())
+        width = 120
+        if col == "id":
+            width = 60
+        elif col in ("nome", "empresa"):
+            width = 180
+        elif col == "email":
+            width = 240
+        elif col == "data_cadastro":
+            width = 120
+        tree.column(col, width=width, anchor="w")
+
+    # Insere linhas
+    if not df.empty:
+        for _, row in df.iterrows():
+            tree.insert("", "end", values=[row[c] for c in columns])
+
+    # Scrollbars (CustomTkinter) ligadas ao Treeview
+    vscroll = ctk.CTkScrollbar(container, orientation="vertical", command=tree.yview)
+    vscroll.pack(side="right", fill="y")
+    tree.configure(yscrollcommand=vscroll.set)
+
+    hscroll = ctk.CTkScrollbar(container, orientation="horizontal", command=tree.xview)
+    hscroll.pack(side="bottom", fill="x")
+    tree.configure(xscrollcommand=hscroll.set)
+
+    # Posiciona a tabela
+    tree.pack(side="left", fill="both", expand=True)
+
+    # ===== Estilo para sensação de “grades” =====
+    style = ttk.Style()
+    style.theme_use("default")
+
+    # Altura de linha, borda e seleção
+    style.configure("Treeview",
+                    rowheight=28,
+                    borderwidth=1)
+    style.map("Treeview",
+              background=[("selected", "#1f6aa5")],
+              foreground=[("selected", "white")])
+
+    # Cabeçalho mais evidente
+    style.configure("Treeview.Heading",
+                    font=("Segoe UI", 10, "bold"),
+                    relief="groove")
+
+    # Zebra (linhas alternadas)
+    for i, item in enumerate(tree.get_children()):
+        tree.item(item, tags=("even",) if i % 2 == 0 else ("odd",))
+    tree.tag_configure("odd", background="#ffffff")
+    tree.tag_configure("even", background="#ffffff")
+
+    # Botão fechar
     btn_close = ctk.CTkButton(win, text="Fechar", command=win.destroy)
     btn_close.pack(pady=8)
 
@@ -118,9 +175,9 @@ def addUsers():
         empresa = entry_empresa.get().strip()
         email = entry_email.get().strip()
         if not nome or not empresa or not email:
-            ctk.CTkMessagebox(title="Atenção", message="Preencha todos os campos.", icon="warning")
+            # Se não tiver CTkMessagebox, use um label ou print
+            print("Atenção: Preencha todos os campos.")
             return
-        # Inserir no BD
         con = sqlite3.connect(DB_PATH)
         try:
             cur = con.cursor()
@@ -129,9 +186,9 @@ def addUsers():
                 (nome, empresa, email, date.today().isoformat())
             )
             con.commit()
-            ctk.CTkMessagebox(title="OK", message="Passageiro adicionado.", icon="check")
+            print("OK: Passageiro adicionado.")
         except sqlite3.IntegrityError as e:
-            ctk.CTkMessagebox(title="Erro", message=f"Email duplicado ou dados inválidos:\n{e}", icon="cancel")
+            print(f"Erro: Email duplicado ou dados inválidos: {e}")
         finally:
             con.close()
 
