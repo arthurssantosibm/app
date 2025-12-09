@@ -17,6 +17,32 @@ add_sql = "INSERT INTO passageiros (nome, empresa, email, data_cadastro) VALUES 
 dados = pd.read_sql_query(query, con)
 con.close()  # bom prática: fechar a conexão após o SELECT
 
+#create table
+cur.execute("""
+    CREATE TABLE IF NOT EXISTS passageiros (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    empresa TEXT NOT NULL,
+    email TEXT UNIQUE,
+    data_cadastro TEXT DEFAULT (DATE('now'))
+    );
+    """)
+#insert into
+cur.execute("""INSERT INTO passageiros (nome, empresa, email, data_cadastro) VALUES
+        ('Simão Pedro', 'IBM', 'simao@ibm.com', '2025-12-09'),
+        ('André', 'IBM', 'andre@ibm.com', '2025-12-09'),
+        ('Tiago, filho de Zebedeu', 'IBM', 'tiago.zebedeu@ibm.com', '2025-12-09'),
+        ('João', 'IBM', 'joao@ibm.com', '2025-12-09'),
+        ('Filipe', 'IBM', 'filipe@ibm.com', '2025-12-09'),
+        ('Bartolomeu (Natanael)', 'IBM', 'bartolomeu@ibm.com', '2025-12-09'),
+        ('Mateus (Levi)', 'IBM', 'mateus@ibm.com', '2025-12-09'),
+        ('Tomé', 'IBM', 'tome@ibm.com', '2025-12-09'),
+        ('Tiago, filho de Alfeu', 'IBM', 'tiago.alfeu@ibm.com', '2025-12-09'),
+        ('Tadeu (Judas, filho de Tiago)', 'IBM', 'tadeu@ibm.com', '2025-12-09'),
+        ('Simão, o Zelote', 'IBM', 'simao.zelote@ibm.com', '2025-12-09'),
+        ('Judas Iscariotes', 'IBM', 'judas@ibm.com', '2025-12-09');
+        """)
+
 # funcao
 def showUsers():
     print(dados)
